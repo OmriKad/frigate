@@ -57,6 +57,7 @@ class ExportJob(Job):
     cpu_fallback: bool = False
     current_step: str = "queued"
     progress_percent: float = 0.0
+    source_review_id: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for API responses.
@@ -344,6 +345,7 @@ class ExportJobManager:
             job.ffmpeg_output_args,
             job.cpu_fallback,
             on_progress=self._make_progress_callback(job),
+            source_review_id=job.source_review_id,
         )
 
         try:

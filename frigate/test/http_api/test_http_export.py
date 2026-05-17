@@ -1431,3 +1431,284 @@ class TestHttpExport(BaseTestHttp):
             )
 
         assert response.status_code == 403
+
+    # --- Source range metadata persistence -----------------------------------
+
+    def _create_export_with_source(
+        self,
+        export_id: str,
+        camera: str,
+        source_type: str,
+        source_start_time: float,
+        source_end_time: float,
+        source_review_id: str | None = None,
+        in_progress: bool = False,
+    ) -> None:
+        Export.create(
+            id=export_id,
+            camera=camera,
+            name=f"Export {export_id}",
+            date=source_start_time,
+            video_path=f"/tmp/{export_id}.mp4",
+            thumb_path=f"/tmp/{export_id}.jpg",
+            in_progress=in_progress,
+            source_type=source_type,
+            source_start_time=source_start_time,
+            source_end_time=source_end_time,
+            source_review_id=source_review_id,
+        )
+
+    def test_single_export_persists_source_metadata(self):
+        """Source range metadata is stored on single-recording export jobs."""
+        self._insert_recording("rec-front", "front_door", 100, 200)
+
+        captured_jobs: list[ExportJob] = []
+
+        def capture_job(_config, job):
+            captured_jobs.append(job)
+            return job.id
+
+        with patch("frigate.api.export.start_export_job", side_effect=capture_job):
+            with AuthTestClient(self.app) as client:
+                response = client.post(
+                    "/export/front_door/start/110/end/150",
+                    json={
+                        "name": "Incident clip",
+                        "source": "recordings",
+                        "source_review_id": "rev_abc123",
+                    },
+                )
+
+        assert response.status_code == 202
+        assert len(captured_jobs) == 1
+        job = captured_jobs[0]
+        assert job.playback_source == "recordings"
+        assert job.request_start_time == 110
+        assert job.request_end_time == 150
+        assert job.source_review_id == "rev_abc123"
+
+    def test_single_export_source_review_id_is_optional(self):
+        """source_review_id can be omitted from single export requests."""
+        self._insert_recording("rec-front", "front_door", 100, 200)
+
+        captured_jobs: list[ExportJob] = []
+
+        def capture_job(_config, job):
+            captured_jobs.append(job)
+            return job.id
+
+        with patch("frigate.api.export.start_export_job", side_effect=capture_job):
+            with AuthTestClient(self.app) as client:
+                response = client.post(
+                    "/export/front_door/start/110/end/150",
+                    json={"name": "No review"},
+                )
+
+        assert response.status_code == 202
+        assert len(captured_jobs) == 1
+        assert captured_jobs[0].source_review_id is None
+
+    def test_batch_export_persists_source_metadata_per_item(self):
+        """Each batch item gets its own source range and optional review ID."""
+        self._insert_recording("rec-front", "front_door", 100, 400)
+
+        captured_jobs: list[ExportJob] = []
+
+        def capture_job(_config, job):
+            captured_jobs.append(job)
+            return job.id
+
+        with patch("frigate.api.export.start_export_job", side_effect=capture_job):
+            with AuthTestClient(self.app) as client:
+                response = client.post(
+                    "/exports/batch",
+                    json={
+                        "items": [
+                            {
+                                "camera": "front_door",
+                                "start_time": 110,
+                                "end_time": 150,
+                                "source_review_id": "rev_front_1",
+                            },
+                            {
+                                "camera": "front_door",
+                                "start_time": 200,
+                                "end_time": 250,
+                            },
+                        ],
+                        "new_case_name": "Range Test",
+                    },
+                )
+
+        assert response.status_code == 202
+        assert len(captured_jobs) == 2
+
+        job_by_start = {job.request_start_time: job for job in captured_jobs}
+
+        job_110 = job_by_start[110]
+        assert job_110.request_start_time == 110
+        assert job_110.request_end_time == 150
+        assert job_110.source_review_id == "rev_front_1"
+
+        job_200 = job_by_start[200]
+        assert job_200.request_start_time == 200
+        assert job_200.request_end_time == 250
+        assert job_200.source_review_id is None
+
+    # --- /exports/ranges endpoint --------------------------------------------
+
+    def test_get_export_ranges_returns_overlapping_exports(self):
+        """Exports whose source range overlaps the query window are returned."""
+        # Overlapping: [100, 160] overlaps [120, 200]
+        self._create_export_with_source("exp_overlap", "front_door", "recordings", 100, 160)
+        # Entirely before: [50, 90] does not overlap [120, 200]
+        self._create_export_with_source("exp_before", "front_door", "recordings", 50, 90)
+        # Entirely after: [250, 300] does not overlap [120, 200]
+        self._create_export_with_source("exp_after", "front_door", "recordings", 250, 300)
+        # Adjacent (touching) at start: source_end_time == after — NOT overlapping
+        self._create_export_with_source("exp_touch", "front_door", "recordings", 50, 120)
+
+        with AuthTestClient(self.app) as client:
+            response = client.get("/exports/ranges?after=120&before=200")
+
+        assert response.status_code == 200
+        results = response.json()
+        result_ids = {r["id"] for r in results}
+        assert "exp_overlap" in result_ids
+        assert "exp_before" not in result_ids
+        assert "exp_after" not in result_ids
+        assert "exp_touch" not in result_ids
+
+    def test_get_export_ranges_excludes_null_source_metadata(self):
+        """Exports without source range metadata are excluded from range lookups."""
+        self._create_export_with_source("exp_with_source", "front_door", "recordings", 100, 200)
+
+        # Export with no source metadata
+        Export.create(
+            id="exp_no_source",
+            camera="front_door",
+            name="No source export",
+            date=100,
+            video_path="/tmp/exp_no_source.mp4",
+            thumb_path="/tmp/exp_no_source.jpg",
+            in_progress=False,
+        )
+
+        with AuthTestClient(self.app) as client:
+            response = client.get("/exports/ranges?after=50&before=300")
+
+        assert response.status_code == 200
+        results = response.json()
+        result_ids = {r["id"] for r in results}
+        assert "exp_with_source" in result_ids
+        assert "exp_no_source" not in result_ids
+
+    def test_get_export_ranges_filters_by_camera_access(self):
+        """Only exports for cameras the user can access are returned."""
+        self._create_export_with_source("exp_front", "front_door", "recordings", 100, 200)
+        # backyard camera exists in config (added in setUp)
+        self._create_export_with_source("exp_back", "backyard", "recordings", 100, 200)
+
+        # Viewer restricted to front_door only
+        with patch(
+            "frigate.api.auth.get_allowed_cameras_for_filter",
+            return_value=["front_door"],
+        ):
+            with AuthTestClient(self.app) as client:
+                response = client.get(
+                    "/exports/ranges?after=50&before=300",
+                    headers={"remote-user": "viewer", "remote-role": "viewer"},
+                )
+
+        assert response.status_code == 200
+        results = response.json()
+        result_ids = {r["id"] for r in results}
+        assert "exp_front" in result_ids
+        assert "exp_back" not in result_ids
+
+    def test_get_export_ranges_optional_camera_filter(self):
+        """The camera query param narrows results to a single camera."""
+        self._create_export_with_source("exp_front", "front_door", "recordings", 100, 200)
+        self._create_export_with_source("exp_back", "backyard", "recordings", 100, 200)
+
+        with AuthTestClient(self.app) as client:
+            response = client.get("/exports/ranges?camera=front_door&after=50&before=300")
+
+        assert response.status_code == 200
+        results = response.json()
+        result_ids = {r["id"] for r in results}
+        assert "exp_front" in result_ids
+        assert "exp_back" not in result_ids
+
+    def test_get_export_ranges_response_shape(self):
+        """Response objects have the expected fields."""
+        self._create_export_with_source(
+            "exp_shape", "front_door", "recordings", 1000.0, 2000.0, in_progress=True
+        )
+
+        with AuthTestClient(self.app) as client:
+            response = client.get("/exports/ranges?after=500&before=2500")
+
+        assert response.status_code == 200
+        results = response.json()
+        assert len(results) == 1
+        item = results[0]
+        assert set(item.keys()) == {
+            "id",
+            "camera",
+            "name",
+            "source_type",
+            "source_start_time",
+            "source_end_time",
+            "in_progress",
+        }
+        assert item["id"] == "exp_shape"
+        assert item["camera"] == "front_door"
+        assert item["source_type"] == "recordings"
+        assert item["source_start_time"] == 1000.0
+        assert item["source_end_time"] == 2000.0
+        assert item["in_progress"] is True
+
+    def test_get_export_ranges_no_before_returns_all_after(self):
+        """Omitting before returns all exports whose source_end_time > after."""
+        self._create_export_with_source("exp_a", "front_door", "recordings", 100, 200)
+        self._create_export_with_source("exp_b", "front_door", "recordings", 300, 400)
+        self._create_export_with_source("exp_old", "front_door", "recordings", 10, 50)
+
+        with AuthTestClient(self.app) as client:
+            response = client.get("/exports/ranges?after=60")
+
+        assert response.status_code == 200
+        results = response.json()
+        result_ids = {r["id"] for r in results}
+        assert "exp_a" in result_ids
+        assert "exp_b" in result_ids
+        assert "exp_old" not in result_ids
+
+    def test_get_export_ranges_any_intersection_semantics(self):
+        """Overlap is any-intersection: source_start < before AND source_end > after."""
+        # Completely spans the window [100, 200]
+        self._create_export_with_source("exp_span", "front_door", "recordings", 50, 250)
+        # Starts before window, ends inside
+        self._create_export_with_source("exp_enter", "front_door", "recordings", 50, 150)
+        # Starts inside window, ends after
+        self._create_export_with_source("exp_exit", "front_door", "recordings", 150, 300)
+        # Entirely inside
+        self._create_export_with_source("exp_inside", "front_door", "recordings", 110, 190)
+        # Touches end (source_start == before) — NOT overlapping
+        self._create_export_with_source("exp_touch_end", "front_door", "recordings", 200, 300)
+        # Ends exactly at after (source_end == after) — NOT overlapping
+        self._create_export_with_source("exp_touch_start", "front_door", "recordings", 50, 100)
+
+        with AuthTestClient(self.app) as client:
+            response = client.get("/exports/ranges?after=100&before=200")
+
+        assert response.status_code == 200
+        results = response.json()
+        result_ids = {r["id"] for r in results}
+        assert "exp_span" in result_ids
+        assert "exp_enter" in result_ids
+        assert "exp_exit" in result_ids
+        assert "exp_inside" in result_ids
+        assert "exp_touch_end" not in result_ids
+        assert "exp_touch_start" not in result_ids

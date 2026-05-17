@@ -8,6 +8,20 @@ export type Export = {
   in_progress: boolean;
   export_case?: string | null;
   export_case_id?: string | null;
+  source_type?: string | null;
+  source_start_time?: number | null;
+  source_end_time?: number | null;
+  source_review_id?: string | null;
+};
+
+export type ExportRange = {
+  id: string;
+  camera: string;
+  name: string;
+  source_type: string;
+  source_start_time: number;
+  source_end_time: number;
+  in_progress: boolean;
 };
 
 export type ExportCase = {
@@ -34,6 +48,7 @@ export type BatchExportItem = {
   image_path?: string;
   friendly_name?: string;
   client_item_id?: string;
+  source_review_id?: string;
 };
 
 export type BatchExportResult = {

@@ -50,6 +50,7 @@ from frigate.api.defs.response.export_response import (
     ExportJobModel,
     ExportJobsResponse,
     ExportModel,
+    ExportRangeModel,
     ExportsResponse,
     StartExportResponse,
 )
@@ -254,6 +255,7 @@ def _build_export_job(
     ffmpeg_input_args: Optional[str] = None,
     ffmpeg_output_args: Optional[str] = None,
     cpu_fallback: bool = False,
+    source_review_id: Optional[str] = None,
 ) -> ExportJob:
     return ExportJob(
         id=_generate_export_id(camera_name),
@@ -267,6 +269,7 @@ def _build_export_job(
         ffmpeg_input_args=ffmpeg_input_args,
         ffmpeg_output_args=ffmpeg_output_args,
         cpu_fallback=cpu_fallback,
+        source_review_id=source_review_id,
     )
 
 
@@ -319,6 +322,64 @@ def get_exports(
 
     exports = query.order_by(Export.date.desc()).dicts().iterator()
     return JSONResponse(content=[e for e in exports])
+
+
+@router.get(
+    "/exports/ranges",
+    response_model=List[ExportRangeModel],
+    dependencies=[Depends(allow_any_authenticated())],
+    summary="Get export source ranges",
+    description="""Returns exports whose source range overlaps the requested window
+    (any-intersection: source_start_time < before AND source_end_time > after).
+    Only exports with non-null source metadata are returned. Only exports for cameras
+    the current user can access are returned.""",
+)
+def get_export_ranges(
+    camera: Optional[str] = None,
+    after: float = 0.0,
+    before: Optional[float] = None,
+    allowed_cameras: List[str] = Depends(get_allowed_cameras_for_filter),
+):
+    query = (
+        Export.select(
+            Export.id,
+            Export.camera,
+            Export.name,
+            Export.source_type,
+            Export.source_start_time,
+            Export.source_end_time,
+            Export.in_progress,
+        )
+        .where(Export.camera << allowed_cameras)
+        .where(Export.source_start_time.is_null(False))
+        .where(Export.source_end_time.is_null(False))
+        .where(Export.source_type.is_null(False))
+    )
+
+    if camera is not None:
+        query = query.where(Export.camera == camera)
+
+    # Any-intersection: export range overlaps [after, before)
+    # i.e. source_start_time < before AND source_end_time > after
+    query = query.where(Export.source_end_time > after)
+    if before is not None:
+        query = query.where(Export.source_start_time < before)
+
+    results = []
+    for export in query.dicts().iterator():
+        results.append(
+            {
+                "id": export["id"],
+                "camera": export["camera"],
+                "name": export["name"],
+                "source_type": export["source_type"],
+                "source_start_time": export["source_start_time"],
+                "source_end_time": export["source_end_time"],
+                "in_progress": bool(export["in_progress"]),
+            }
+        )
+
+    return JSONResponse(content=results)
 
 
 @router.get(
@@ -725,6 +786,7 @@ def export_recordings_batch(
             sanitized_images[index],
             PlaybackSourceEnum.recordings,
             export_case_id,
+            source_review_id=item.source_review_id,
         )
         try:
             start_export_job(request.app.frigate_config, export_job)
@@ -839,6 +901,7 @@ def export_recording(
         existing_image,
         playback_source,
         export_case_id,
+        source_review_id=body.source_review_id,
     )
     try:
         start_export_job(request.app.frigate_config, export_job)
@@ -990,6 +1053,7 @@ def export_recording_custom(
         ffmpeg_input_args,
         ffmpeg_output_args,
         cpu_fallback,
+        source_review_id=body.source_review_id,
     )
     try:
         start_export_job(request.app.frigate_config, export_job)

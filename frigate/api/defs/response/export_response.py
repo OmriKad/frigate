@@ -18,6 +18,38 @@ class ExportModel(BaseModel):
     export_case_id: Optional[str] = Field(
         default=None, description="ID of the export case this export belongs to"
     )
+    source_type: Optional[str] = Field(
+        default=None,
+        description="Source type for the export (e.g. 'recordings' or 'preview')",
+    )
+    source_start_time: Optional[float] = Field(
+        default=None, description="Unix timestamp of the export source range start"
+    )
+    source_end_time: Optional[float] = Field(
+        default=None, description="Unix timestamp of the export source range end"
+    )
+    source_review_id: Optional[str] = Field(
+        default=None,
+        description="Review segment ID this export originated from, if any",
+    )
+
+
+class ExportRangeModel(BaseModel):
+    """Compact model for range-overlap lookups."""
+
+    id: str = Field(description="Unique identifier for the export")
+    camera: str = Field(description="Camera name associated with this export")
+    name: str = Field(description="Friendly name of the export")
+    source_type: str = Field(description="Source type for the export")
+    source_start_time: float = Field(
+        description="Unix timestamp of the export source range start"
+    )
+    source_end_time: float = Field(
+        description="Unix timestamp of the export source range end"
+    )
+    in_progress: bool = Field(
+        description="Whether the export is currently being processed"
+    )
 
 
 class StartExportResponse(BaseModel):

@@ -103,6 +103,10 @@ class Export(Model):
         backref="exports",
         column_name="export_case_id",
     )
+    source_type = CharField(null=True, max_length=30)
+    source_start_time = FloatField(null=True)
+    source_end_time = FloatField(null=True)
+    source_review_id = CharField(null=True, max_length=30)
 
 
 class ReviewSegment(Model):
