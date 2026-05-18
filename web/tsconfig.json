@@ -10,6 +10,8 @@
       "@/*": ["./src/*"]
     },
 
+    "types": ["vitest/importMeta"],
+
     /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,

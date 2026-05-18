@@ -65,6 +65,7 @@ import { useTimezone } from "@/hooks/use-date-utils";
 import { useTimelineZoom } from "@/hooks/use-timeline-zoom";
 import { useTranslation } from "react-i18next";
 import { useTimelineUtils } from "@/hooks/use-timeline-utils";
+import { useExportedRanges } from "@/hooks/use-exported-ranges";
 import {
   Tooltip,
   TooltipContent,
@@ -202,6 +203,13 @@ export function RecordingView({
   const [exportMode, setExportMode] = useState<ExportMode>("none");
   const [exportRange, setExportRange] = useState<TimeRange>();
   const [showExportPreview, setShowExportPreview] = useState(false);
+
+  const { exportedRanges: exportRangesForDialog } = useExportedRanges(
+    mainCamera,
+    currentTimeRange.after,
+    currentTimeRange.before,
+    exportRange != undefined,
+  );
 
   // debug replay
 
@@ -661,6 +669,7 @@ export function RecordingView({
                 mode={exportMode}
                 range={exportRange}
                 showPreview={showExportPreview}
+                exportedRanges={exportRangesForDialog}
                 setRange={(range) => {
                   setExportRange(range);
 
@@ -1099,6 +1108,14 @@ function Timeline({
     },
   ]);
 
+  const showExportHandles = exportRange != undefined;
+  const { exportedRanges } = useExportedRanges(
+    mainCamera,
+    timeRange.after,
+    timeRange.before,
+    showExportHandles,
+  );
+
   const [exportStart, setExportStartTime] = useState<number>(0);
   const [exportEnd, setExportEndTime] = useState<number>(0);
 
@@ -1161,6 +1178,7 @@ function Timeline({
             showExportHandles={exportRange != undefined}
             exportStartTime={exportRange?.after}
             exportEndTime={exportRange?.before}
+            exportedRanges={exportedRanges}
             setExportStartTime={setExportStartTime}
             setExportEndTime={setExportEndTime}
             handlebarTime={currentTime}

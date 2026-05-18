@@ -24,8 +24,10 @@ import {
   BatchExportResponse,
   CameraActivity,
   ExportCase,
+  ExportRange,
   StartExportResponse,
 } from "@/types/export";
+import { rangeOverlapsExports } from "@/utils/exportRangeUtils";
 import {
   Select,
   SelectContent,
@@ -74,6 +76,7 @@ type ExportDialogProps = {
   range?: TimeRange;
   mode: ExportMode;
   showPreview: boolean;
+  exportedRanges?: ExportRange[];
   setRange: (range: TimeRange | undefined) => void;
   setMode: (mode: ExportMode) => void;
   setShowPreview: (showPreview: boolean) => void;
@@ -86,6 +89,7 @@ export default function ExportDialog({
   range,
   mode,
   showPreview,
+  exportedRanges,
   setRange,
   setMode,
   setShowPreview,
@@ -98,6 +102,16 @@ export default function ExportDialog({
   const [activeTab, setActiveTab] = useState<ExportTab>("export");
   const [isStartingExport, setIsStartingExport] = useState(false);
   const previousModeRef = useRef<ExportMode>(mode);
+
+  const overlapWarning = useMemo(() => {
+    if (!range || !exportedRanges?.length) return undefined;
+    if (!rangeOverlapsExports(range.after, range.before, exportedRanges))
+      return undefined;
+    return t("export.fromTimeline.rangeOverlapsExisting", {
+      defaultValue:
+        "Selected range overlaps an existing export. You can still export anyway.",
+    });
+  }, [range, exportedRanges, t]);
 
   useEffect(() => {
     const previousMode = previousModeRef.current;
@@ -233,6 +247,7 @@ export default function ExportDialog({
         show={mode == "timeline" || mode == "timeline_multi"}
         hidePreview={mode == "timeline_multi"}
         isSaving={isStartingExport}
+        overlapWarning={overlapWarning}
         saveLabel={
           mode == "timeline_multi"
             ? t("export.fromTimeline.useThisRange")

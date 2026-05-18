@@ -3,6 +3,8 @@ import { useTimelineUtils } from "@/hooks/use-timeline-utils";
 import { cn } from "@/lib/utils";
 import { DraggableElement } from "@/types/draggable-element";
 import { TimelineZoomDirection, ZoomLevel } from "@/types/review";
+import { ExportRange } from "@/types/export";
+import { mergeExportRanges } from "@/utils/exportRangeUtils";
 import {
   ReactNode,
   RefObject,
@@ -45,6 +47,7 @@ export type ReviewTimelineProps = {
   onZoomChange?: (newZoomLevel: number) => void;
   possibleZoomLevels?: ZoomLevel[];
   currentZoomLevel?: number;
+  exportedRanges?: ExportRange[];
   children: ReactNode;
 };
 
@@ -74,6 +77,7 @@ export function ReviewTimeline({
   onZoomChange,
   possibleZoomLevels,
   currentZoomLevel,
+  exportedRanges,
   children,
 }: ReviewTimelineProps) {
   const { t } = useTranslation("views/events");
@@ -124,6 +128,19 @@ export function ReviewTimeline({
       return alignEndDateToTimeline(exportEndTime);
     }
   }, [exportEndTime, alignEndDateToTimeline]);
+
+  const TINT_CLASSES: Record<1 | 2 | 3, string> = {
+    1: "bg-amber-500/20",
+    2: "bg-amber-500/30",
+    3: "bg-amber-500/40",
+  };
+
+  const exportTintSegments = useMemo(() => {
+    if (!showExportHandles || !exportedRanges?.length) return [];
+    const windowAfter = timelineStartAligned - timelineDuration;
+    const windowBefore = timelineStartAligned;
+    return mergeExportRanges(exportedRanges, windowAfter, windowBefore);
+  }, [showExportHandles, exportedRanges, timelineStartAligned, timelineDuration]);
 
   const {
     handleMouseDown: handlebarMouseDown,
@@ -383,6 +400,19 @@ export function ReviewTimeline({
         )}
       >
         <div ref={segmentsRef} className="relative flex flex-col">
+          {exportTintSegments.map((seg, i) => (
+            <div
+              key={i}
+              className={cn(
+                "pointer-events-none absolute inset-x-0 z-0",
+                TINT_CLASSES[seg.intensity],
+              )}
+              style={{
+                top: `${((timelineStartAligned - seg.endTime) / segmentDuration) * segmentHeight}px`,
+                height: `${Math.max(((seg.endTime - seg.startTime) / segmentDuration) * segmentHeight, 2)}px`,
+              }}
+            />
+          ))}
           <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-[30px] w-full bg-gradient-to-b from-secondary to-transparent"></div>
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-[30px] w-full bg-gradient-to-t from-secondary to-transparent"></div>
           {children}
