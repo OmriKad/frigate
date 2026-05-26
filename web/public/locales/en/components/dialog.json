@@ -120,7 +120,8 @@
       "saveExport": "Save Export",
       "queueingExport": "Queueing Export...",
       "previewExport": "Preview Export",
-      "useThisRange": "Use This Range"
+      "useThisRange": "Use This Range",
+      "rangeOverlapsExisting": "Selected range overlaps an existing export. You can still export anyway."
     }
   },
   "streaming": {
