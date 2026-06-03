@@ -113,7 +113,7 @@
       "error": {
         "failed": "Failed to queue export: {{error}}",
         "endTimeMustAfterStartTime": "End time must be after start time",
-        "noVaildTimeSelected": "No valid time range selected"
+        "noValidTimeSelected": "No valid time range selected"
       }
     },
     "fromTimeline": {
@@ -121,7 +121,8 @@
       "queueingExport": "Queueing Export...",
       "previewExport": "Preview Export",
       "useThisRange": "Use This Range",
-      "rangeOverlapsExisting": "Selected range overlaps an existing export. You can still export anyway."
+      "rangeOverlapsExistingDetail_one": "Overlaps 1 existing export — about {{overlap}} of {{total}} already exported",
+      "rangeOverlapsExistingDetail_other": "Overlaps {{count}} existing exports — about {{overlap}} of {{total}} already exported"
     }
   },
   "streaming": {

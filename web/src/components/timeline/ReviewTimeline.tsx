@@ -4,7 +4,6 @@ import { cn } from "@/lib/utils";
 import { DraggableElement } from "@/types/draggable-element";
 import { TimelineZoomDirection, ZoomLevel } from "@/types/review";
 import { ExportRange } from "@/types/export";
-import { mergeExportRanges } from "@/utils/exportRangeUtils";
 import {
   ReactNode,
   RefObject,
@@ -129,17 +128,49 @@ export function ReviewTimeline({
     }
   }, [exportEndTime, alignEndDateToTimeline]);
 
-  const TINT_CLASSES: Record<1 | 2 | 3, string> = {
-    1: "bg-amber-500/20",
-    2: "bg-amber-500/30",
-    3: "bg-amber-500/40",
+  const EXPORT_TINT_CLASSES = [
+    "bg-amber-500/40",
+    "bg-sky-500/40",
+    "bg-violet-500/40",
+    "bg-emerald-500/40",
+    "bg-rose-500/40",
+    "bg-cyan-500/40",
+  ];
+  const EXPORT_SWATCH_CLASSES = [
+    "bg-amber-500",
+    "bg-sky-500",
+    "bg-violet-500",
+    "bg-emerald-500",
+    "bg-rose-500",
+    "bg-cyan-500",
+  ];
+  const colorIndexForExport = (id: string): number => {
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+      hash = (hash * 31 + id.charCodeAt(i)) & 0x7fffffff;
+    }
+    return hash % EXPORT_TINT_CLASSES.length;
   };
 
-  const exportTintSegments = useMemo(() => {
+  const visibleExportBands = useMemo(() => {
     if (!showExportHandles || !exportedRanges?.length) return [];
     const windowAfter = timelineStartAligned - timelineDuration;
     const windowBefore = timelineStartAligned;
-    return mergeExportRanges(exportedRanges, windowAfter, windowBefore);
+    return exportedRanges
+      .filter(
+        (e) =>
+          e.source_start_time < windowBefore &&
+          e.source_end_time > windowAfter,
+      )
+      .map((e) => ({
+        id: e.id,
+        name: e.name,
+        startTime: Math.max(e.source_start_time, windowAfter),
+        endTime: Math.min(e.source_end_time, windowBefore),
+        colorIdx: colorIndexForExport(e.id),
+      }))
+      .sort((a, b) => a.startTime - b.startTime);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showExportHandles, exportedRanges, timelineStartAligned, timelineDuration]);
 
   const {
@@ -400,19 +431,71 @@ export function ReviewTimeline({
         )}
       >
         <div ref={segmentsRef} className="relative flex flex-col">
-          {exportTintSegments.map((seg, i) => (
-            <div
-              key={i}
-              className={cn(
-                "pointer-events-none absolute inset-x-0 z-0",
-                TINT_CLASSES[seg.intensity],
-              )}
-              style={{
-                top: `${((timelineStartAligned - seg.endTime) / segmentDuration) * segmentHeight}px`,
-                height: `${Math.max(((seg.endTime - seg.startTime) / segmentDuration) * segmentHeight, 2)}px`,
-              }}
-            />
-          ))}
+          {visibleExportBands.map((band) => {
+            const alsoCovering = (exportedRanges ?? []).filter(
+              (e) =>
+                e.id !== band.id &&
+                e.source_start_time < band.endTime &&
+                e.source_end_time > band.startTime,
+            );
+            return (
+              <Tooltip key={band.id}>
+                <TooltipTrigger asChild>
+                  <div
+                    className={cn(
+                      "absolute inset-x-0 z-10 cursor-help",
+                      EXPORT_TINT_CLASSES[band.colorIdx],
+                    )}
+                    style={{
+                      top: `${((timelineStartAligned - band.endTime) / segmentDuration) * segmentHeight}px`,
+                      height: `${Math.max(((band.endTime - band.startTime) / segmentDuration) * segmentHeight, 2)}px`,
+                    }}
+                  />
+                </TooltipTrigger>
+                <TooltipPortal>
+                  <TooltipContent side="left" className="max-w-xs">
+                    <div className="text-xs">
+                      <div className="flex items-center gap-1.5 font-medium">
+                        <span
+                          className={cn(
+                            "size-2 flex-shrink-0 rounded-full",
+                            EXPORT_SWATCH_CLASSES[band.colorIdx],
+                          )}
+                        />
+                        <span className="truncate">{band.name}</span>
+                      </div>
+                      {alsoCovering.length > 0 && (
+                        <ul className="mt-1.5 space-y-0.5 text-muted-foreground">
+                          <li className="text-[11px] uppercase tracking-wide">
+                            Also covering this time:
+                          </li>
+                          {alsoCovering.slice(0, 4).map((e) => (
+                            <li
+                              key={e.id}
+                              className="flex items-center gap-1.5 truncate"
+                            >
+                              <span
+                                className={cn(
+                                  "size-1.5 flex-shrink-0 rounded-full",
+                                  EXPORT_SWATCH_CLASSES[colorIndexForExport(e.id)],
+                                )}
+                              />
+                              <span className="truncate">{e.name}</span>
+                            </li>
+                          ))}
+                          {alsoCovering.length > 4 && (
+                            <li className="italic">
+                              + {alsoCovering.length - 4} more
+                            </li>
+                          )}
+                        </ul>
+                      )}
+                    </div>
+                  </TooltipContent>
+                </TooltipPortal>
+              </Tooltip>
+            );
+          })}
           <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-[30px] w-full bg-gradient-to-b from-secondary to-transparent"></div>
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-[30px] w-full bg-gradient-to-t from-secondary to-transparent"></div>
           {children}

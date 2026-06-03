@@ -27,7 +27,10 @@ import {
   ExportRange,
   StartExportResponse,
 } from "@/types/export";
-import { rangeOverlapsExports } from "@/utils/exportRangeUtils";
+import {
+  computeRangeOverlap,
+  formatDurationShort,
+} from "@/utils/exportRangeUtils";
 import {
   Select,
   SelectContent,
@@ -105,11 +108,18 @@ export default function ExportDialog({
 
   const overlapWarning = useMemo(() => {
     if (!range || !exportedRanges?.length) return undefined;
-    if (!rangeOverlapsExports(range.after, range.before, exportedRanges))
-      return undefined;
-    return t("export.fromTimeline.rangeOverlapsExisting", {
+    const stats = computeRangeOverlap(
+      range.after,
+      range.before,
+      exportedRanges,
+    );
+    if (!stats) return undefined;
+    return t("export.fromTimeline.rangeOverlapsExistingDetail", {
+      count: stats.count,
+      overlap: formatDurationShort(stats.overlapSeconds),
+      total: formatDurationShort(stats.totalSeconds),
       defaultValue:
-        "Selected range overlaps an existing export. You can still export anyway.",
+        "Overlaps {{count}} existing export(s) — about {{overlap}} of {{total}} already exported",
     });
   }, [range, exportedRanges, t]);
 

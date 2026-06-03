@@ -84,6 +84,49 @@ export function rangeOverlapsExports(
   );
 }
 
+export type OverlapStats = {
+  count: number;
+  overlapSeconds: number;
+  totalSeconds: number;
+};
+
+/**
+ * Computes overlap stats between [rangeAfter, rangeBefore] and the given
+ * export ranges. Returns null when there is no overlap. The overlap duration
+ * is a union (not a sum), so overlapping exports don't double-count.
+ */
+export function computeRangeOverlap(
+  rangeAfter: number,
+  rangeBefore: number,
+  exports: ExportRange[],
+): OverlapStats | null {
+  if (rangeBefore <= rangeAfter) return null;
+  const matching = exports.filter(
+    (e) => e.source_start_time < rangeBefore && e.source_end_time > rangeAfter,
+  );
+  if (matching.length === 0) return null;
+  const segments = mergeExportRanges(matching, rangeAfter, rangeBefore);
+  const overlapSeconds = segments.reduce(
+    (sum, seg) => sum + (seg.endTime - seg.startTime),
+    0,
+  );
+  return {
+    count: matching.length,
+    overlapSeconds,
+    totalSeconds: rangeBefore - rangeAfter,
+  };
+}
+
+/** Compact human duration: "45 sec", "12 min", "1 hr 5 min". */
+export function formatDurationShort(seconds: number): string {
+  if (seconds < 60) return `${Math.round(seconds)} sec`;
+  const totalMin = Math.round(seconds / 60);
+  if (totalMin < 60) return `${totalMin} min`;
+  const hours = Math.floor(totalMin / 60);
+  const min = totalMin % 60;
+  return min === 0 ? `${hours} hr` : `${hours} hr ${min} min`;
+}
+
 if (import.meta.vitest) {
   const { describe, it, expect } = import.meta.vitest;
 
