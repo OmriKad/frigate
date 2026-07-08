@@ -58,6 +58,7 @@ import { useNavigate } from "react-router-dom";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 
 const EXPORT_OPTIONS = [
+  "alerted section",
   "1",
   "4",
   "8",
@@ -74,6 +75,7 @@ type ExportDialogProps = {
   latestTime: number;
   currentTime: number;
   range?: TimeRange;
+  originalClipRange?: TimeRange;
   mode: ExportMode;
   showPreview: boolean;
   exportedRanges?: ExportRange[];
@@ -87,6 +89,7 @@ export default function ExportDialog({
   latestTime,
   currentTime,
   range,
+  originalClipRange,
   mode,
   showPreview,
   exportedRanges,
@@ -280,13 +283,20 @@ export default function ExportDialog({
               aria-label={t("menu.export", { ns: "common" })}
               size="sm"
               onClick={() => {
-                const now = new Date(latestTime * 1000);
-                now.setHours(now.getHours() - 1);
-                setActiveTab("export");
-                setRange({
-                  before: latestTime,
-                  after: now.getTime() / 1000,
-                });
+
+                if (!range) {
+                  if (originalClipRange) {
+                    setRange(originalClipRange);
+                  } else {
+                    const now = new Date(latestTime * 1000);
+                    now.setHours(now.getHours() - 1);
+                    setActiveTab("export");
+                    setRange({
+                      before: latestTime,
+                      after: now.getTime() / 1000,
+                    });
+                  }
+                }
                 setMode("select");
               }}
             >
@@ -305,6 +315,7 @@ export default function ExportDialog({
             latestTime={latestTime}
             currentTime={currentTime}
             range={range}
+            originalClipRange={originalClipRange}
             name={name}
             selectedCaseId={selectedCaseId}
             singleNewCaseName={singleNewCaseName}
@@ -335,6 +346,7 @@ type ExportContentProps = {
   selectedCaseId?: string;
   singleNewCaseName: string;
   singleNewCaseDescription: string;
+  originalClipRange?: TimeRange;
   activeTab: ExportTab;
   isStartingExport: boolean;
   onStartExport: () => Promise<boolean>;
@@ -352,6 +364,7 @@ export function ExportContent({
   latestTime,
   currentTime,
   range,
+  originalClipRange,
   name,
   selectedCaseId,
   singleNewCaseName,
@@ -541,6 +554,15 @@ export function ExportContent({
       let start = 0;
 
       switch (option) {
+        case "alerted section":
+          if (originalClipRange) {
+            setRange(originalClipRange);
+            return;
+          }
+          // fallback to last 1 hour if no original range available
+          now.setHours(now.getHours() - 1);
+          start = now.getTime() / 1000;
+          break;
         case "1":
           now.setHours(now.getHours() - 1);
           start = now.getTime() / 1000;
@@ -573,7 +595,7 @@ export function ExportContent({
         after: start,
       });
     },
-    [latestTime, setRange],
+    [latestTime, setRange, originalClipRange],
   );
 
   const toggleCameraSelection = useCallback((cameraId: string) => {

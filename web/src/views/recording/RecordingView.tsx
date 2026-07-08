@@ -87,6 +87,11 @@ const DATA_REFRESH_TIME = 600000; // 10 minutes
 type RecordingViewProps = {
   startCamera: string;
   startTime: number;
+  selectedReview: {
+    start_time: number;
+    end_time?: number;
+  };
+
   reviewItems?: ReviewSegment[];
   reviewSummary?: ReviewSummary;
   timeRange: TimeRange;
@@ -99,6 +104,7 @@ type RecordingViewProps = {
 export function RecordingView({
   startCamera,
   startTime,
+  selectedReview,
   reviewItems,
   reviewSummary,
   timeRange,
@@ -596,6 +602,11 @@ export function RecordingView({
     [mainControllerRef],
   );
 
+  const previewTimeRange: TimeRange = {
+  before: (selectedReview.end_time ?? startTime) + 10,
+  after: selectedReview.start_time - 10,
+};
+
   return (
     <DetailStreamProvider
       isDetailMode={timelineType === "detail"}
@@ -668,6 +679,7 @@ export function RecordingView({
                 latestTime={timeRange.before}
                 mode={exportMode}
                 range={exportRange}
+                originalClipRange={previewTimeRange}
                 showPreview={showExportPreview}
                 exportedRanges={exportRangesForDialog}
                 setRange={(range) => {
