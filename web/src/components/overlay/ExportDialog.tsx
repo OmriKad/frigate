@@ -27,7 +27,10 @@ import {
   ExportRange,
   StartExportResponse,
 } from "@/types/export";
-import { rangeOverlapsExports } from "@/utils/exportRangeUtils";
+import {
+  computeRangeOverlap,
+  formatDurationShort,
+} from "@/utils/exportRangeUtils";
 import {
   Select,
   SelectContent,
@@ -108,13 +111,21 @@ export default function ExportDialog({
 
   const overlapWarning = useMemo(() => {
     if (!range || !exportedRanges?.length) return undefined;
-    if (!rangeOverlapsExports(range.after, range.before, exportedRanges))
-      return undefined;
-    return t("export.fromTimeline.rangeOverlapsExisting", {
+    const stats = computeRangeOverlap(
+      range.after,
+      range.before,
+      exportedRanges,
+    );
+    if (!stats) return undefined;
+    return t("export.fromTimeline.rangeOverlapsExistingDetail", {
+      count: stats.count,
+      overlap: formatDurationShort(stats.overlapSeconds),
+      total: formatDurationShort(stats.totalSeconds),
       defaultValue:
-        "Selected range overlaps an existing export. You can still export anyway.",
+        "Overlaps {{count}} existing export(s) — about {{overlap}} of {{total}} already exported",
     });
   }, [range, exportedRanges, t]);
+
 
   useEffect(() => {
     const previousMode = previousModeRef.current;
@@ -317,6 +328,7 @@ export default function ExportDialog({
             range={range}
             originalClipRange={originalClipRange}
             name={name}
+            exportedRanges={exportedRanges}
             selectedCaseId={selectedCaseId}
             singleNewCaseName={singleNewCaseName}
             singleNewCaseDescription={singleNewCaseDescription}
@@ -343,6 +355,7 @@ type ExportContentProps = {
   currentTime: number;
   range?: TimeRange;
   name: string;
+  exportedRanges?: ExportRange[] | undefined;
   selectedCaseId?: string;
   singleNewCaseName: string;
   singleNewCaseDescription: string;
@@ -366,6 +379,7 @@ export function ExportContent({
   range,
   originalClipRange,
   name,
+  exportedRanges,
   selectedCaseId,
   singleNewCaseName,
   singleNewCaseDescription,
@@ -470,6 +484,27 @@ export function ExportContent({
         ]
       : null,
   );
+
+const overlapStats = useMemo(() => {
+  if (exportedRanges==undefined||!exportedRanges.length) return undefined;
+
+  let after: number;
+  let before: number;
+
+  if (selectedOption === "timeline" || selectedOption === "custom") {
+    if (!range) return undefined;
+
+    after = range.after;
+    before = range.before;
+  } else {
+    const hours = parseInt(selectedOption);
+
+    before = currentTime;
+    after = currentTime - hours * 3600;
+  }
+
+  return computeRangeOverlap(after, before, exportedRanges);
+}, [selectedOption, range, currentTime, exportedRanges]);
 
   const cameraActivities = useMemo<CameraActivity[]>(() => {
     const allCameraIds = Object.keys(config?.cameras ?? {});
@@ -749,6 +784,8 @@ export function ExportContent({
     navigate,
   ]);
 
+
+
   return (
     <div
       className={cn(
@@ -812,6 +849,16 @@ export function ExportContent({
               </div>
             ))}
           </RadioGroup>
+
+         {overlapStats && (
+         <p className="text-sm text-muted-foreground">
+         {t("export.overlapSummary", {
+          count: overlapStats.count,
+          overlap: formatDurationShort(overlapStats.overlapSeconds),
+          total: formatDurationShort(overlapStats.totalSeconds),
+           })}
+         </p>
+          )}
 
           {selectedOption == "custom" && (
             <CustomTimeSelector

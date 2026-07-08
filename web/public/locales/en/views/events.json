@@ -19,6 +19,10 @@
     "label": "Timeline",
     "aria": "Select timeline"
   },
+  "exportedRange": {
+    "heading_one": "1 export covers this range",
+    "heading_other": "{{count}} exports cover this range"
+  },
   "zoomIn": "Zoom In",
   "zoomOut": "Zoom Out",
   "events": {
