@@ -485,8 +485,10 @@ export function ExportContent({
       : null,
   );
 
-const overlapStats = useMemo(() => {
-  if (exportedRanges==undefined||!exportedRanges.length) return undefined;
+  const overlapStats = useMemo(() => {
+  if (!exportedRanges?.length) {
+    return undefined;
+  }
 
   let after: number;
   let before: number;
@@ -851,11 +853,11 @@ const overlapStats = useMemo(() => {
           </RadioGroup>
 
          {overlapStats && (
-         <p className="text-sm text-muted-foreground">
-         {t("export.overlapSummary", {
-          count: overlapStats.count,
-          overlap: formatDurationShort(overlapStats.overlapSeconds),
-          total: formatDurationShort(overlapStats.totalSeconds),
+          <p className="text-sm text-muted-foreground">
+          {t("export.overlapSummary", {
+           count: overlapStats.count,
+           overlap: formatDurationShort(overlapStats.overlapSeconds),
+           total: formatDurationShort(overlapStats.totalSeconds),
            })}
          </p>
           )}

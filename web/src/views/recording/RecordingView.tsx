@@ -212,8 +212,8 @@ export function RecordingView({
 
   const { exportedRanges: exportRangesForDialog } = useExportedRanges(
     mainCamera,
-    currentTimeRange.after,
-    currentTimeRange.before,
+    timeRange.after,
+    timeRange.before,
     exportRange != undefined,
   );
 
