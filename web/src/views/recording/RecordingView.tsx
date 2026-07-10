@@ -603,9 +603,9 @@ export function RecordingView({
   );
 
   const previewTimeRange: TimeRange = {
-  before: (selectedReview.end_time ?? startTime) + 10,
-  after: selectedReview.start_time - 10,
-};
+    before: (selectedReview.end_time ?? startTime) + 10,
+    after: selectedReview.start_time - 10,
+  };
 
   return (
     <DetailStreamProvider

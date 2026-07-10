@@ -33,9 +33,9 @@ export function mergeExportRanges(
 
   if (clipped.length === 0) return [];
 
-  const points = [
-    ...new Set(clipped.flatMap((r) => [r.start, r.end])),
-  ].sort((a, b) => a - b);
+  const points = [...new Set(clipped.flatMap((r) => [r.start, r.end]))].sort(
+    (a, b) => a - b,
+  );
 
   const segments: DisplaySegment[] = [];
 
@@ -60,7 +60,12 @@ export function mergeExportRanges(
     ) {
       last.endTime = segEnd;
     } else {
-      segments.push({ startTime: segStart, endTime: segEnd, intensity, inProgress });
+      segments.push({
+        startTime: segStart,
+        endTime: segEnd,
+        intensity,
+        inProgress,
+      });
     }
   }
 
@@ -88,6 +93,7 @@ export type OverlapStats = {
   count: number;
   overlapSeconds: number;
   totalSeconds: number;
+  segments: DisplaySegment[];
 };
 
 /**
@@ -114,6 +120,7 @@ export function computeRangeOverlap(
     count: matching.length,
     overlapSeconds,
     totalSeconds: rangeBefore - rangeAfter,
+    segments,
   };
 }
 
@@ -166,7 +173,11 @@ if (import.meta.vitest) {
     it("assigns intensity 1 for a single non-overlapping range", () => {
       const result = mergeExportRanges([makeRange(10, 50)], 0, 100);
       expect(result).toHaveLength(1);
-      expect(result[0]).toMatchObject({ startTime: 10, endTime: 50, intensity: 1 });
+      expect(result[0]).toMatchObject({
+        startTime: 10,
+        endTime: 50,
+        intensity: 1,
+      });
     });
 
     it("produces three segments with intensity 1, 2, 1 for two partially overlapping ranges", () => {
@@ -176,14 +187,31 @@ if (import.meta.vitest) {
         100,
       );
       expect(result).toHaveLength(3);
-      expect(result[0]).toMatchObject({ startTime: 0, endTime: 30, intensity: 1 });
-      expect(result[1]).toMatchObject({ startTime: 30, endTime: 60, intensity: 2 });
-      expect(result[2]).toMatchObject({ startTime: 60, endTime: 100, intensity: 1 });
+      expect(result[0]).toMatchObject({
+        startTime: 0,
+        endTime: 30,
+        intensity: 1,
+      });
+      expect(result[1]).toMatchObject({
+        startTime: 30,
+        endTime: 60,
+        intensity: 2,
+      });
+      expect(result[2]).toMatchObject({
+        startTime: 60,
+        endTime: 100,
+        intensity: 1,
+      });
     });
 
     it("caps intensity at 3 for four or more overlapping ranges", () => {
       const result = mergeExportRanges(
-        [makeRange(0, 100), makeRange(0, 100), makeRange(0, 100), makeRange(0, 100)],
+        [
+          makeRange(0, 100),
+          makeRange(0, 100),
+          makeRange(0, 100),
+          makeRange(0, 100),
+        ],
         0,
         100,
       );
@@ -198,7 +226,11 @@ if (import.meta.vitest) {
         100,
       );
       expect(result).toHaveLength(1);
-      expect(result[0]).toMatchObject({ startTime: 0, endTime: 100, intensity: 1 });
+      expect(result[0]).toMatchObject({
+        startTime: 0,
+        endTime: 100,
+        intensity: 1,
+      });
     });
 
     it("does not merge adjacent segments when intensity differs", () => {
@@ -209,8 +241,16 @@ if (import.meta.vitest) {
         100,
       );
       expect(result).toHaveLength(2);
-      expect(result[0]).toMatchObject({ startTime: 0, endTime: 50, intensity: 2 });
-      expect(result[1]).toMatchObject({ startTime: 50, endTime: 100, intensity: 1 });
+      expect(result[0]).toMatchObject({
+        startTime: 0,
+        endTime: 50,
+        intensity: 2,
+      });
+      expect(result[1]).toMatchObject({
+        startTime: 50,
+        endTime: 100,
+        intensity: 1,
+      });
     });
 
     it("propagates inProgress when any covering range is in progress", () => {

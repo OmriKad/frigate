@@ -59,6 +59,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Textarea } from "../ui/textarea";
 import { useNavigate } from "react-router-dom";
 import { useIsAdmin } from "@/hooks/use-is-admin";
+import { Info } from "lucide-react";
+import { useDateLocale } from "@/hooks/use-date-locale";
+import { useTimeFormat } from "@/hooks/use-date-utils";
+import { formatUnixTimestampToDateTime } from "@/utils/dateUtil";
 
 const EXPORT_OPTIONS = [
   "alerted section",
@@ -125,7 +129,6 @@ export default function ExportDialog({
         "Overlaps {{count}} existing export(s) — about {{overlap}} of {{total}} already exported",
     });
   }, [range, exportedRanges, t]);
-
 
   useEffect(() => {
     const previousMode = previousModeRef.current;
@@ -294,7 +297,6 @@ export default function ExportDialog({
               aria-label={t("menu.export", { ns: "common" })}
               size="sm"
               onClick={() => {
-
                 if (!range) {
                   if (originalClipRange) {
                     setRange(originalClipRange);
@@ -486,27 +488,48 @@ export function ExportContent({
   );
 
   const overlapStats = useMemo(() => {
-  if (!exportedRanges?.length) {
-    return undefined;
-  }
+    if (!exportedRanges?.length) {
+      return undefined;
+    }
 
-  let after: number;
-  let before: number;
+    let after: number;
+    let before: number;
 
-  if (selectedOption === "timeline" || selectedOption === "custom") {
-    if (!range) return undefined;
+    if (selectedOption === "timeline" || selectedOption === "custom") {
+      if (!range) return undefined;
 
-    after = range.after;
-    before = range.before;
-  } else {
-    const hours = parseInt(selectedOption);
+      after = range.after;
+      before = range.before;
+    } else {
+      const hours = parseInt(selectedOption);
 
-    before = currentTime;
-    after = currentTime - hours * 3600;
-  }
+      before = currentTime;
+      after = currentTime - hours * 3600;
+    }
 
-  return computeRangeOverlap(after, before, exportedRanges);
-}, [selectedOption, range, currentTime, exportedRanges]);
+    return computeRangeOverlap(after, before, exportedRanges);
+  }, [selectedOption, range, currentTime, exportedRanges]);
+
+  const locale = useDateLocale();
+  const timeFormat = useTimeFormat(config);
+
+  const formatString = useMemo(
+    () =>
+      t(`time.formattedTimestampHourMinuteSecond.${timeFormat}`, {
+        ns: "common",
+      }),
+    [t, timeFormat],
+  );
+
+  const formatOverlapTime = useCallback(
+    (timestamp: number) =>
+      formatUnixTimestampToDateTime(timestamp, {
+        timezone: config?.ui.timezone,
+        date_format: formatString,
+        locale,
+      }),
+    [config?.ui.timezone, formatString, locale],
+  );
 
   const cameraActivities = useMemo<CameraActivity[]>(() => {
     const allCameraIds = Object.keys(config?.cameras ?? {});
@@ -786,8 +809,6 @@ export function ExportContent({
     navigate,
   ]);
 
-
-
   return (
     <div
       className={cn(
@@ -852,14 +873,33 @@ export function ExportContent({
             ))}
           </RadioGroup>
 
-         {overlapStats && (
-          <p className="text-sm text-muted-foreground">
-          {t("export.overlapSummary", {
-           count: overlapStats.count,
-           overlap: formatDurationShort(overlapStats.overlapSeconds),
-           total: formatDurationShort(overlapStats.totalSeconds),
-           })}
-         </p>
+          {overlapStats && (
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <span>
+                {t("export.overlapSummary", {
+                  count: overlapStats.count,
+                  overlap: formatDurationShort(overlapStats.overlapSeconds),
+                  total: formatDurationShort(overlapStats.totalSeconds),
+                })}
+              </span>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-4 w-4 cursor-help" />
+                </TooltipTrigger>
+
+                <TooltipContent className="max-w-xs">
+                  <div className="space-y-1">
+                    {overlapStats.segments.map((segment) => (
+                      <div key={segment.startTime}>
+                        {formatOverlapTime(segment.startTime)} –{" "}
+                        {formatOverlapTime(segment.endTime)}
+                      </div>
+                    ))}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </div>
           )}
 
           {selectedOption == "custom" && (
