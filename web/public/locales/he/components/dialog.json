@@ -28,6 +28,7 @@
       "lastHour_two": "שעות אחרונות {{count}}",
       "lastHour_other": "שעות אחרונות {{count}}",
       "custom": "מותאם אישית",
+      "alerted_section": "מקטע שהתריע",
       "start": {
         "title": "זמן התחלה",
         "label": "בחירת זמן התחלה"

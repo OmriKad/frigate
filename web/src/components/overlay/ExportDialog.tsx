@@ -65,7 +65,7 @@ import { useTimeFormat } from "@/hooks/use-date-utils";
 import { formatUnixTimestampToDateTime } from "@/utils/dateUtil";
 
 const EXPORT_OPTIONS = [
-  "alerted section",
+  "alerted_section",
   "1",
   "4",
   "8",
@@ -616,7 +616,7 @@ export function ExportContent({
       let start = 0;
 
       switch (option) {
-        case "alerted section":
+        case "alerted_section":
           if (originalClipRange) {
             setRange(originalClipRange);
             return;

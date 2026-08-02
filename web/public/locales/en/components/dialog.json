@@ -37,6 +37,7 @@
       "lastHour_one": "Last Hour",
       "lastHour_other": "Last {{count}} Hours",
       "custom": "Custom",
+      "alerted_section": "Alerted Section",
       "start": {
         "title": "Start Time",
         "label": "Select Start Time"
