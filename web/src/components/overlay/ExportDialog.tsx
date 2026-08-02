@@ -495,7 +495,7 @@ export function ExportContent({
     let after: number;
     let before: number;
 
-    if (selectedOption === "custom") {
+    if (selectedOption === "custom" || selectedOption === "alerted_section") {
       if (!range) return undefined;
 
       after = range.after;
