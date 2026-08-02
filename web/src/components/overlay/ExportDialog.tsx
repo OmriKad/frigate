@@ -495,11 +495,13 @@ export function ExportContent({
     let after: number;
     let before: number;
 
-    if (selectedOption === "timeline" || selectedOption === "custom") {
+    if (selectedOption === "custom") {
       if (!range) return undefined;
 
       after = range.after;
       before = range.before;
+    } else if (selectedOption === "timeline") {
+      return undefined;
     } else {
       const hours = parseInt(selectedOption);
 
