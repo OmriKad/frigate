@@ -602,10 +602,16 @@ export function RecordingView({
     [mainControllerRef],
   );
 
-  const previewTimeRange: TimeRange = {
-    before: (selectedReview.end_time ?? startTime) + 10,
-    after: selectedReview.start_time - 10,
-  };
+  const previewTimeRange = useMemo(() => {
+    if (selectedReview.end_time == null) {
+      return undefined;
+    }
+
+    return {
+      after: selectedReview.start_time - 4,
+      before: selectedReview.end_time + 4,
+    };
+  }, [selectedReview]);
 
   return (
     <DetailStreamProvider

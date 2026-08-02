@@ -423,6 +423,18 @@ export function ExportContent({
     return `${Math.round(range.after)}-${Math.round(range.before)}`;
   }, [activeTab, range]);
 
+  const exportOptions = useMemo(() => {
+    const options: ExportOption[] = [];
+
+    if (originalClipRange) {
+      options.push("alerted_section");
+    }
+
+    options.push("1", "4", "8", "12", "24", "timeline", "custom");
+
+    return options;
+  }, [originalClipRange]);
+
   useEffect(() => {
     if (activeTab !== "multi") {
       setDebouncedRange(undefined);
@@ -848,7 +860,7 @@ export function ExportContent({
             onValueChange={(value) => onSelectTime(value as ExportOption)}
             value={selectedOption}
           >
-            {EXPORT_OPTIONS.map((opt) => (
+            {exportOptions.map((opt) => (
               <div key={opt} className="flex items-center gap-2">
                 <RadioGroupItem
                   className={
