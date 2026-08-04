@@ -124,6 +124,19 @@ export function computeRangeOverlap(
   };
 }
 
+export function getExportCoveragePercent(
+  rangeAfter: number,
+  rangeBefore: number,
+  exports: ExportRange[],
+): number {
+  if (rangeBefore <= rangeAfter) return 0;
+
+  const overlap = computeRangeOverlap(rangeAfter, rangeBefore, exports);
+  if (!overlap) return 0;
+
+  return Math.round((overlap.overlapSeconds / overlap.totalSeconds) * 100);
+}
+
 /** Compact human duration: "45 sec", "12 min", "1 hr 5 min". */
 export function formatDurationShort(seconds: number): string {
   if (seconds < 60) return `${Math.round(seconds)} sec`;
@@ -154,6 +167,16 @@ if (import.meta.vitest) {
   describe("mergeExportRanges", () => {
     it("returns empty array when no ranges", () => {
       expect(mergeExportRanges([], 0, 100)).toEqual([]);
+    });
+
+    it("returns the covered percentage for a range with overlapping exports", () => {
+      const result = getExportCoveragePercent(0, 100, [makeRange(0, 40)]);
+      expect(result).toBe(40);
+    });
+
+    it("returns 100 when the range is fully covered by exports", () => {
+      const result = getExportCoveragePercent(0, 100, [makeRange(0, 100)]);
+      expect(result).toBe(100);
     });
 
     it("returns empty array when all ranges are outside the window", () => {

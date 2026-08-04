@@ -13,6 +13,7 @@
     "desc": "No frames have been received on the {{cameraName}} <code>detect</code> stream, check error logs"
   },
   "cameraDisabled": "Camera is disabled",
+  "exportCoverage": "{{percent}}% exported",
   "stats": {
     "streamType": {
       "title": "Stream Type:",

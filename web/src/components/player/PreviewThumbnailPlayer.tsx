@@ -1,24 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useApiHost } from "@/api";
 import { isCurrentHour } from "@/utils/dateUtil";
+import ReviewThumbnail from "./ReviewThumbnail";
 import {
   ReviewSegment,
   ThreatLevel,
   THREAT_LEVEL_LABELS,
 } from "@/types/review";
 import { getIconForLabel } from "@/utils/iconUtil";
-import TimeAgo from "../dynamic/TimeAgo";
-import useSWR from "swr";
-import { FrigateConfig } from "@/types/frigateConfig";
 import { isIOS, isMobile, isSafari } from "react-device-detect";
 import Chip from "@/components/indicators/Chip";
-import { useFormattedTimestamp, use24HourTime } from "@/hooks/use-date-utils";
 import useImageLoaded from "@/hooks/use-image-loaded";
 import { useSwipeable } from "react-swipeable";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
-import ImageLoadingIndicator from "../indicators/ImageLoadingIndicator";
 import useContextMenu from "@/hooks/use-contextmenu";
-import ActivityIndicator from "../indicators/activity-indicator";
 import { TimeRange } from "@/types/timeline";
 import { cn } from "@/lib/utils";
 import { InProgressPreview, VideoPreview } from "../preview/ScrubbablePreview";
@@ -29,6 +24,7 @@ import { FaExclamationTriangle } from "react-icons/fa";
 import { MdOutlinePersonSearch } from "react-icons/md";
 import { getTranslatedLabel } from "@/utils/i18n";
 import { formatList } from "@/utils/stringUtil";
+import { useExportedRanges } from "@/hooks/use-exported-ranges";
 
 type PreviewPlayerProps = {
   review: ReviewSegment;
@@ -51,8 +47,15 @@ export default function PreviewThumbnailPlayer({
 }: PreviewPlayerProps) {
   const { t } = useTranslation(["components/player", "views/events"]);
   const apiHost = useApiHost();
-  const { data: config } = useSWR<FrigateConfig>("config");
   const [imgRef, imgLoaded, onImgLoad] = useImageLoaded();
+  const rangeAfter = review.start_time;
+  const rangeBefore = review.end_time ?? timeRange.before;
+  const { exportedRanges } = useExportedRanges(
+    review.camera,
+    rangeAfter,
+    rangeBefore,
+    true,
+  );
 
   // interaction
 
@@ -172,17 +175,6 @@ export default function PreviewThumbnailPlayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isHovered, scrollLock, tooltipHovering]);
 
-  // date
-
-  const is24Hour = use24HourTime(config);
-  const formattedDate = useFormattedTimestamp(
-    review.start_time,
-    is24Hour
-      ? t("time.formattedTimestampMonthDayHourMinute.24hour", { ns: "common" })
-      : t("time.formattedTimestampMonthDayHourMinute.12hour", { ns: "common" }),
-    config?.ui?.timezone,
-  );
-
   const getEventType = (text: string) => {
     if (review.data.sub_labels?.includes(text)) return "manual";
     if (review.data.audio.includes(text)) return "audio";
@@ -215,10 +207,6 @@ export default function PreviewThumbnailPlayer({
           />
         </div>
       )}
-      <ImageLoadingIndicator
-        className="absolute inset-0"
-        imgLoaded={imgLoaded}
-      />
       <div className={`${imgLoaded ? "visible" : "invisible"}`}>
         <img
           ref={imgRef}
@@ -248,6 +236,13 @@ export default function PreviewThumbnailPlayer({
             )}
           />
         )}
+        <ReviewThumbnail
+          timeRange={{
+            after: rangeAfter,
+            before: rangeBefore,
+          }}
+          exportedRanges={exportedRanges}
+        />
         <div
           className={cn(
             "absolute left-0 top-2 flex gap-2",
@@ -262,8 +257,8 @@ export default function PreviewThumbnailPlayer({
             >
               <TooltipTrigger asChild>
                 <div className="ml-3 pb-1 text-sm text-white">
-                  {(review.severity == "alert" ||
-                    review.severity == "detection") && (
+                  {(review.severity === "alert" ||
+                    review.severity === "detection") && (
                     <>
                       <Chip
                         className={`flex items-start justify-between space-x-1 ${playingBack ? "hidden" : ""} bg-gradient-to-br ${review.has_been_reviewed ? "bg-green-600 from-green-600 to-green-700" : "bg-gray-500 from-gray-400 to-gray-500"} z-0`}
@@ -326,8 +321,8 @@ export default function PreviewThumbnailPlayer({
               >
                 <TooltipTrigger asChild>
                   <div className="pb-1 text-sm text-white">
-                    {(review.severity == "alert" ||
-                      review.severity == "detection") && (
+                    {(review.severity === "alert" ||
+                      review.severity === "detection") && (
                       <>
                         <Chip
                           className={`flex items-start justify-between space-x-1 ${playingBack ? "hidden" : ""} z-0 bg-gray-500 bg-gradient-to-br from-gray-400 to-gray-500`}
@@ -366,25 +361,6 @@ export default function PreviewThumbnailPlayer({
             </Tooltip>
           )}
         </div>
-        {!playingBack && (
-          <div
-            className={cn(
-              "rounded-b-l pointer-events-none absolute inset-x-0 bottom-0 h-[20%] w-full bg-gradient-to-t from-black/60 to-transparent",
-              !isSafari && "z-10",
-            )}
-          >
-            <div className="mx-3 flex h-full items-end justify-between pb-1 text-sm text-white">
-              {review.end_time ? (
-                <TimeAgo time={review.start_time * 1000} dense />
-              ) : (
-                <div>
-                  <ActivityIndicator size={24} />
-                </div>
-              )}
-              {formattedDate}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
