@@ -22,12 +22,7 @@ export default function ReviewThumbnail({
   );
 
   return (
-    <div
-      className={cn(
-        "pointer-events-none absolute inset-x-2 bottom-2 z-40",
-        className,
-      )}
-    >
+    <div className={cn("pointer-events-none w-full", className)}>
       <div className="rounded-full border border-white/15 bg-black/50 p-1 backdrop-blur-sm">
         <Progress value={progressValue} className="h-1.5" />
       </div>

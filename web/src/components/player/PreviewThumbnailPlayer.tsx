@@ -21,6 +21,9 @@ import { Preview } from "@/types/preview";
 import { baseUrl } from "@/api/baseUrl";
 import { useTranslation } from "react-i18next";
 import { FaExclamationTriangle } from "react-icons/fa";
+import { use24HourTime, useFormattedTimestamp } from "@/hooks/use-date-utils";
+import useSWR from "swr";
+import { FrigateConfig } from "@/types/frigateConfig";
 import { MdOutlinePersonSearch } from "react-icons/md";
 import { getTranslatedLabel } from "@/utils/i18n";
 import { formatList } from "@/utils/stringUtil";
@@ -47,6 +50,8 @@ export default function PreviewThumbnailPlayer({
 }: PreviewPlayerProps) {
   const { t } = useTranslation(["components/player", "views/events"]);
   const apiHost = useApiHost();
+  const { data: config } = useSWR<FrigateConfig>("config");
+  const is24Hour = use24HourTime(config);
   const [imgRef, imgLoaded, onImgLoad] = useImageLoaded();
   const rangeAfter = review.start_time;
   const rangeBefore = review.end_time ?? timeRange.before;
@@ -181,6 +186,14 @@ export default function PreviewThumbnailPlayer({
     return "object";
   };
 
+  const formattedDate = useFormattedTimestamp(
+    review.start_time,
+    is24Hour
+      ? t("time.formattedTimestampHourMinute.24hour", { ns: "common" })
+      : t("time.formattedTimestampHourMinute.12hour", { ns: "common" }),
+    config?.ui.timezone,
+  );
+
   return (
     <div
       className="relative size-full cursor-pointer"
@@ -207,112 +220,57 @@ export default function PreviewThumbnailPlayer({
           />
         </div>
       )}
-      <div className={`${imgLoaded ? "visible" : "invisible"}`}>
-        <img
-          ref={imgRef}
-          className={`size-full select-none transition-opacity ${
-            playingBack ? "opacity-0" : "opacity-100"
-          }`}
-          style={
-            isIOS
-              ? {
-                  WebkitUserSelect: "none",
-                  WebkitTouchCallout: "none",
-                }
-              : undefined
-          }
-          draggable={false}
-          src={`${apiHost}${review.thumb_path.replace("/media/frigate/", "")}`}
-          loading={isSafari ? "eager" : "lazy"}
-          onLoad={() => {
-            onImgLoad();
-          }}
-        />
-        {!playingBack && (
+      <div
+        className={cn(
+          "flex h-full w-full flex-col",
+          imgLoaded ? "visible" : "invisible",
+        )}
+      >
+        <div className="relative h-full w-full flex-1">
+          <img
+            ref={imgRef}
+            className={`h-full w-full select-none transition-opacity ${
+              playingBack ? "opacity-0" : "opacity-100"
+            }`}
+            style={
+              isIOS
+                ? {
+                    WebkitUserSelect: "none",
+                    WebkitTouchCallout: "none",
+                  }
+                : undefined
+            }
+            draggable={false}
+            src={`${apiHost}${review.thumb_path.replace("/media/frigate/", "")}`}
+            loading={isSafari ? "eager" : "lazy"}
+            onLoad={() => {
+              onImgLoad();
+            }}
+          />
+          {!playingBack && (
+            <div
+              className={cn(
+                "rounded-t-l pointer-events-none absolute inset-x-0 top-0 h-[30%] w-full bg-gradient-to-b from-black/60 to-transparent",
+                !isSafari && "z-10",
+              )}
+            />
+          )}
           <div
             className={cn(
-              "rounded-t-l pointer-events-none absolute inset-x-0 top-0 h-[30%] w-full bg-gradient-to-b from-black/60 to-transparent",
-              !isSafari && "z-10",
+              "pointer-events-none absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black/70 via-black/35 to-transparent px-3 pb-3 pt-6",
+              !isSafari && "z-30",
             )}
-          />
-        )}
-        <ReviewThumbnail
-          timeRange={{
-            after: rangeAfter,
-            before: rangeBefore,
-          }}
-          exportedRanges={exportedRanges}
-        />
-        <div
-          className={cn(
-            "absolute left-0 top-2 flex gap-2",
-            !isSafari && "z-40",
-          )}
-        >
-          <Tooltip>
-            <div
-              className="flex"
-              onMouseEnter={() => setTooltipHovering(true)}
-              onMouseLeave={() => setTooltipHovering(false)}
-            >
-              <TooltipTrigger asChild>
-                <div className="ml-3 pb-1 text-sm text-white">
-                  {(review.severity === "alert" ||
-                    review.severity === "detection") && (
-                    <>
-                      <Chip
-                        className={`flex items-start justify-between space-x-1 ${playingBack ? "hidden" : ""} bg-gradient-to-br ${review.has_been_reviewed ? "bg-green-600 from-green-600 to-green-700" : "bg-gray-500 from-gray-400 to-gray-500"} z-0`}
-                        onClick={() => onClick(review, false, true)}
-                      >
-                        {review.data.objects
-                          .sort()
-                          .map((object, idx) =>
-                            getIconForLabel(
-                              object,
-                              "object",
-                              "size-3 text-white",
-                              `${object}-${idx}`,
-                            ),
-                          )}
-                        {review.data.audio.map((audio) => {
-                          return getIconForLabel(
-                            audio,
-                            "audio",
-                            "size-3 text-white",
-                          );
-                        })}
-                      </Chip>
-                    </>
-                  )}
-                </div>
-              </TooltipTrigger>
+          >
+            <div className="text-[11px] font-medium text-white/90 drop-shadow-sm">
+              {formattedDate}
             </div>
-            <TooltipContent>
-              {review.data.metadata
-                ? review.data.metadata.title
-                : formatList(
-                    [
-                      ...new Set([
-                        ...(review.data.objects || []),
-                        ...(review.data.sub_labels || []),
-                        ...(review.data.audio || []),
-                      ]),
-                    ]
-                      .filter(
-                        (item) =>
-                          item !== undefined && !item.includes("-verified"),
-                      )
-                      .map((text) =>
-                        getTranslatedLabel(text, getEventType(text)),
-                      )
-                      .sort(),
-                  )}
-            </TooltipContent>
-          </Tooltip>
-          {!!(
-            review.data.metadata?.potential_threat_level &&
-            !review.has_been_reviewed
-          ) && (
+          </div>
+          <div
+            className={cn(
+              "pointer-events-none absolute inset-x-0 top-0 z-40 flex gap-2 px-3 pt-2",
+              !isSafari && "z-40",
+            )}
+          >
             <Tooltip>
               <div
                 className="flex"
@@ -320,46 +278,122 @@ export default function PreviewThumbnailPlayer({
                 onMouseLeave={() => setTooltipHovering(false)}
               >
                 <TooltipTrigger asChild>
-                  <div className="pb-1 text-sm text-white">
+                  <div className="ml-3 pb-1 text-sm text-white">
                     {(review.severity === "alert" ||
                       review.severity === "detection") && (
                       <>
                         <Chip
-                          className={`flex items-start justify-between space-x-1 ${playingBack ? "hidden" : ""} z-0 bg-gray-500 bg-gradient-to-br from-gray-400 to-gray-500`}
+                          className={`flex items-start justify-between space-x-1 ${playingBack ? "hidden" : ""} bg-gradient-to-br ${review.has_been_reviewed ? "bg-green-600 from-green-600 to-green-700" : "bg-gray-500 from-gray-400 to-gray-500"} z-0`}
                           onClick={() => onClick(review, false, true)}
                         >
-                          {review.data.metadata.potential_threat_level == 1 ? (
-                            <MdOutlinePersonSearch className="size-3" />
-                          ) : (
-                            <FaExclamationTriangle className="size-3" />
-                          )}
+                          {review.data.objects
+                            .sort()
+                            .map((object, idx) =>
+                              getIconForLabel(
+                                object,
+                                "object",
+                                "size-3 text-white",
+                                `${object}-${idx}`,
+                              ),
+                            )}
+                          {review.data.audio.map((audio) => {
+                            return getIconForLabel(
+                              audio,
+                              "audio",
+                              "size-3 text-white",
+                            );
+                          })}
                         </Chip>
                       </>
                     )}
                   </div>
                 </TooltipTrigger>
               </div>
-              <TooltipContent className="smart-capitalize">
-                {(() => {
-                  const threatLevel =
-                    review.data.metadata.potential_threat_level ?? 0;
-                  switch (threatLevel) {
-                    case ThreatLevel.NEEDS_REVIEW:
-                      return t("needsReview", { ns: "views/events" });
-                    case ThreatLevel.SECURITY_CONCERN:
-                      return t("securityConcern", { ns: "views/events" });
-                    default:
-                      return (
-                        THREAT_LEVEL_LABELS[threatLevel as ThreatLevel] ||
-                        t("details.unknown", {
-                          ns: "views/classificationModel",
-                        })
-                      );
-                  }
-                })()}
+              <TooltipContent>
+                {review.data.metadata
+                  ? review.data.metadata.title
+                  : formatList(
+                      [
+                        ...new Set([
+                          ...(review.data.objects || []),
+                          ...(review.data.sub_labels || []),
+                          ...(review.data.audio || []),
+                        ]),
+                      ]
+                        .filter(
+                          (item) =>
+                            item !== undefined && !item.includes("-verified"),
+                        )
+                        .map((text) =>
+                          getTranslatedLabel(text, getEventType(text)),
+                        )
+                        .sort(),
+                    )}
               </TooltipContent>
             </Tooltip>
-          )}
+            {!!(
+              review.data.metadata?.potential_threat_level &&
+              !review.has_been_reviewed
+            ) && (
+              <Tooltip>
+                <div
+                  className="flex"
+                  onMouseEnter={() => setTooltipHovering(true)}
+                  onMouseLeave={() => setTooltipHovering(false)}
+                >
+                  <TooltipTrigger asChild>
+                    <div className="pb-1 text-sm text-white">
+                      {(review.severity === "alert" ||
+                        review.severity === "detection") && (
+                        <>
+                          <Chip
+                            className={`flex items-start justify-between space-x-1 ${playingBack ? "hidden" : ""} z-0 bg-gray-500 bg-gradient-to-br from-gray-400 to-gray-500`}
+                            onClick={() => onClick(review, false, true)}
+                          >
+                            {review.data.metadata.potential_threat_level ==
+                            1 ? (
+                              <MdOutlinePersonSearch className="size-3" />
+                            ) : (
+                              <FaExclamationTriangle className="size-3" />
+                            )}
+                          </Chip>
+                        </>
+                      )}
+                    </div>
+                  </TooltipTrigger>
+                </div>
+                <TooltipContent className="smart-capitalize">
+                  {(() => {
+                    const threatLevel =
+                      review.data.metadata.potential_threat_level ?? 0;
+                    switch (threatLevel) {
+                      case ThreatLevel.NEEDS_REVIEW:
+                        return t("needsReview", { ns: "views/events" });
+                      case ThreatLevel.SECURITY_CONCERN:
+                        return t("securityConcern", { ns: "views/events" });
+                      default:
+                        return (
+                          THREAT_LEVEL_LABELS[threatLevel as ThreatLevel] ||
+                          t("details.unknown", {
+                            ns: "views/classificationModel",
+                          })
+                        );
+                    }
+                  })()}
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+        </div>
+        <div className="px-2 pb-2 pt-1">
+          <ReviewThumbnail
+            timeRange={{
+              after: rangeAfter,
+              before: rangeBefore,
+            }}
+            exportedRanges={exportedRanges}
+            className="w-full flex-shrink-0"
+          />
         </div>
       </div>
     </div>
