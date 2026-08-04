@@ -860,7 +860,7 @@ function DetectionReview({
                     }
                     className="review-item relative rounded-lg"
                   >
-                    <div className="aspect-video overflow-hidden rounded-lg">
+                    <div className="overflow-visible rounded-lg">
                       <PreviewThumbnailPlayer
                         review={value}
                         allPreviews={relevantPreviews}

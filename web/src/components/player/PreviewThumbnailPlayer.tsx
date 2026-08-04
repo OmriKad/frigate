@@ -203,7 +203,7 @@ export default function PreviewThumbnailPlayer({
 
   return (
     <div
-      className="relative size-full cursor-pointer"
+      className="relative flex w-full cursor-pointer flex-col"
       onMouseOver={isMobile ? undefined : () => setIsHovered(true)}
       onMouseLeave={isMobile ? undefined : () => setIsHovered(false)}
       onClick={handleOnClick}
@@ -227,11 +227,16 @@ export default function PreviewThumbnailPlayer({
           />
         </div>
       )}
-      <ImageLoadingIndicator
-        className="absolute inset-0"
-        imgLoaded={imgLoaded}
-      />
-      <div className={`${imgLoaded ? "visible" : "invisible"}`}>
+      <div
+        className={cn(
+          "relative aspect-video w-full overflow-hidden rounded-lg",
+          imgLoaded ? "visible" : "invisible",
+        )}
+      >
+        <ImageLoadingIndicator
+          className="absolute inset-0"
+          imgLoaded={imgLoaded}
+        />
         <img
           ref={imgRef}
           className={`size-full select-none transition-opacity ${
@@ -398,7 +403,7 @@ export default function PreviewThumbnailPlayer({
           </div>
         )}
       </div>
-      <div className="px-2 pb-2 pt-1">
+      <div className="relative z-10 px-2 pb-2 pt-1">
         <ReviewThumbnail
           timeRange={{
             after: rangeAfter,
