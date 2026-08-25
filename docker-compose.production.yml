@@ -1,0 +1,32 @@
+services:
+  frigate:
+    container_name: frigate
+    build:
+      context: .
+      dockerfile: docker/main/Dockerfile
+      target: frigate
+
+    shm_size: "256mb"
+
+    ports:
+      - "5000:5000"
+      - "8554:8554"
+      - "8555:8555/tcp"
+      - "8555:8555/udp"
+
+    volumes:
+      - ./config:/config
+      - ./debug:/media/frigate
+      - /etc/localtime:/etc/localtime:ro
+
+    environment:
+      YOLO_MODELS: ""
+
+    restart: unless-stopped
+
+  mqtt:
+    container_name: mqtt
+    image: eclipse-mosquitto:2.0
+    command: mosquitto -c /mosquitto-no-auth.conf
+    ports:
+      - "1883:1883"
